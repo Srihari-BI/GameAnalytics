@@ -1,0 +1,177 @@
+-- 1. Calculate Monthly Active Users (MAU) for Games
+WITH monthly_active_users AS (
+    SELECT
+        game_id,
+        DATE_TRUNC('month', played_at) AS month_start,
+        COUNT(DISTINCT player_id) AS active_users
+    FROM PlayerActivity
+    GROUP BY game_id, month_start
+)
+SELECT
+    g.game_name,
+    mau.month_start,
+    COALESCE(mau.active_users, 0) AS monthly_active_users
+FROM (
+    SELECT DISTINCT game_id, game_name
+    FROM Games
+) g
+CROSS JOIN (
+    SELECT DISTINCT DATE_TRUNC('month', played_at) AS month_start
+    FROM PlayerActivity
+) m
+LEFT JOIN monthly_active_users mau
+    ON g.game_id = mau.game_id AND m.month_start = mau.month_start
+ORDER BY g.game_name, mau.month_start;
+
+-- 2. Calculate Retention Rate for Games
+WITH player_retention AS (
+    SELECT
+        game_id,
+        DATE_TRUNC('week', played_at) AS week_start,
+        COUNT(DISTINCT player_id) AS retained_users,
+        COUNT(DISTINCT CASE WHEN DATEDIFF('week', first_played_at, played_at) = 1 THEN player_id END) AS returning_users
+    FROM (
+        SELECT
+            game_id,
+            player_id,
+            played_at,
+            FIRST_VALUE(played_at) OVER (PARTITION BY player_id, game_id ORDER BY played_at) AS first_played_at
+        FROM PlayerActivity
+    ) pa
+    GROUP BY game_id, week_start
+)
+SELECT
+    g.game_name,
+    pr.week_start,
+    COALESCE(pr.retained_users, 0) AS retained_users,
+    COALESCE(pr.returning_users, 0) AS returning_users,
+    CASE WHEN pr.retained_users > 0 THEN ROUND((pr.returning_users::NUMERIC / pr.retained_users) * 100, 2) ELSE 0 END AS retention_rate
+FROM (
+    SELECT DISTINCT game_id, game_name
+    FROM Games
+) g
+CROSS JOIN (
+    SELECT DISTINCT DATE_TRUNC('week', played_at) AS week_start
+    FROM PlayerActivity
+) w
+LEFT JOIN player_retention pr
+    ON g.game_id = pr.game_id AND w.week_start = pr.week_start
+ORDER BY g.game_name, pr.week_start;
+
+-- 3. Calculate Lifetime Value (LTV) per Player
+WITH player_lifetime_value AS (
+    SELECT
+        player_id,
+        SUM(total_spent) AS total_spent,
+        COUNT(DISTINCT order_id) AS total_orders,
+        EXTRACT(MONTH FROM AGE(NOW(), MIN(order_date))) AS months_since_first_order
+    FROM Orders
+    GROUP BY player_id
+)
+SELECT
+    p.player_name,
+    COALESCE(plv.total_spent, 0) AS total_spent,
+    COALESCE(plv.total_orders, 0) AS total_orders,
+    COALESCE(plv.total_spent / NULLIF(plv.total_orders, 0), 0) AS avg_order_value,
+    COALESCE(plv.total_spent / NULLIF(plv.months_since_first_order, 0), 0) AS monthly_spending,
+    COALESCE(plv.total_spent / NULLIF(plv.months_since_first_order, 0), 0) * 12 AS annual_spending
+FROM Players p
+LEFT JOIN player_lifetime_value plv
+    ON p.player_id = plv.player_id
+ORDER BY p.player_name;
+
+-- 4. Calculate Churn Rate for Games
+WITH player_churn_rate AS (
+    SELECT
+        game_id,
+        DATE_TRUNC('month', last_played_at) AS month_start,
+        COUNT(DISTINCT player_id) AS active_users,
+        COUNT(DISTINCT CASE WHEN DATEDIFF('month', last_played_at, NOW()) >= 1 THEN player_id END) AS churned_users
+    FROM (
+        SELECT
+            game_id,
+            player_id,
+            MAX(played_at) AS last_played_at
+        FROM PlayerActivity
+        GROUP BY game_id, player_id
+    ) pa
+    GROUP BY game_id, month_start
+)
+SELECT
+    g.game_name,
+    pcr.month_start,
+    COALESCE(pcr.active_users, 0) AS active_users,
+    COALESCE(pcr.churned_users, 0) AS churned_users,
+    CASE WHEN pcr.active_users > 0 THEN ROUND((pcr.churned_users::NUMERIC / pcr.active_users) * 100, 2) ELSE 0 END AS churn_rate
+FROM (
+    SELECT DISTINCT game_id, game_name
+    FROM Games
+) g
+CROSS JOIN (
+    SELECT DISTINCT DATE_TRUNC('month', last_played_at) AS month_start
+    FROM (
+        SELECT MAX(played_at) AS last_played_at
+        FROM PlayerActivity
+    ) lp
+) m
+LEFT JOIN player_churn_rate pcr
+    ON g.game_id = pcr.game_id AND m.month_start = pcr.month_start
+ORDER BY g.game_name, pcr.month_start;
+
+-- 5. Analyze Player Engagement Over Time
+WITH player_engagement AS (
+    SELECT
+        player_id,
+        DATE_TRUNC('month', played_at) AS month_start,
+        COUNT(DISTINCT game_id) AS unique_games_played,
+        COUNT(played_at) AS total_game_sessions,
+        SUM(game_duration) AS total_play_time_seconds
+    FROM PlayerActivity
+    GROUP BY player_id, month_start
+)
+SELECT
+    p.player_name,
+    pe.month_start,
+    COALESCE(pe.unique_games_played, 0) AS unique_games_played,
+    COALESCE(pe.total_game_sessions, 0) AS total_game_sessions,
+    COALESCE(pe.total_play_time_seconds, 0) AS total_play_time_seconds,
+    CASE WHEN pe.total_game_sessions > 0 THEN ROUND((pe.total_play_time_seconds::NUMERIC / pe.total_game_sessions) / 60, 2) ELSE 0 END AS avg_session_duration_minutes
+FROM (
+    SELECT DISTINCT player_id, player_name
+    FROM Players
+) p
+CROSS JOIN (
+    SELECT DISTINCT DATE_TRUNC('month', played_at) AS month_start
+    FROM PlayerActivity
+) m
+LEFT JOIN player_engagement pe
+    ON p.player_id = pe.player_id AND m.month_start = pe.month_start
+ORDER BY p.player_name, pe.month_start;
+
+-- 6. Segment Player Spending Behavior
+WITH player_spending_segments AS (
+    SELECT
+        player_id,
+        CASE
+            WHEN total_spent <= 50 THEN 'Low Spender'
+            WHEN total_spent > 50 AND total_spent <= 200 THEN 'Medium Spender'
+            WHEN total_spent > 200 THEN 'High Spender'
+            ELSE 'Unknown'
+        END AS spending_segment
+    FROM (
+        SELECT
+            player_id,
+            SUM(total_spent) AS total_spent
+        FROM Orders
+        GROUP BY player_id
+    ) player_total_spent
+)
+SELECT
+    p.player_name,
+    ps.spending_segment,
+    COUNT(*) AS player_count
+FROM Players p
+LEFT JOIN player_spending_segments ps
+    ON p.player_id = ps.player_id
+GROUP BY p.player_name, ps.spending_segment
+ORDER BY p.player_name, ps.spending_segment;
