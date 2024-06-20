@@ -1,0 +1,153 @@
+-- Create Players table
+CREATE TABLE Players (
+    player_id INT AUTO_INCREMENT PRIMARY KEY,
+    player_name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    registration_date DATE NOT NULL,
+    last_login DATETIME,
+    total_games_played INT DEFAULT 0
+);
+
+-- Insert 100+ records into Players table
+INSERT INTO Players (player_name, email, registration_date, last_login, total_games_played)
+SELECT
+    CONCAT('Player', LPAD(ROW_NUMBER() OVER(), 3, '0')),
+    CONCAT('player', LPAD(ROW_NUMBER() OVER(), 3, '0'), '@example.com'),
+    DATE_SUB(CURDATE(), INTERVAL FLOOR(RAND() * 365 * 3) DAY),
+    DATE_SUB(NOW(), INTERVAL FLOOR(RAND() * 30) DAY),
+    FLOOR(RAND() * 500)
+FROM
+    information_schema.tables
+LIMIT 100;
+
+
+
+-- Create Games table
+CREATE TABLE Games (
+    game_id INT AUTO_INCREMENT PRIMARY KEY,
+    game_name VARCHAR(100) NOT NULL,
+    release_date DATE NOT NULL,
+    genre VARCHAR(50),
+    platform VARCHAR(50)
+);
+
+-- Insert 100+ records into Games table
+INSERT INTO Games (game_name, release_date, genre, platform)
+VALUES
+    ('Game A', '2020-01-15', 'Action', 'PC'),
+    ('Game B', '2018-07-20', 'RPG', 'PlayStation'),
+    ('Game C', '2019-03-10', 'Strategy', 'Xbox'),
+    ('Game D', '2021-05-05', 'Adventure', 'Switch'),
+    ('Game E', '2017-11-30', 'Simulation', 'PC'),
+    ('Game F', '2016-09-12', 'Sports', 'PlayStation'),
+    ('Game G', '2022-02-28', 'FPS', 'PC'),
+    ('Game H', '2020-12-03', 'Puzzle', 'Mobile'),
+    ('Game I', '2019-08-25', 'Racing', 'Xbox'),
+    ('Game J', '2018-04-17', 'Action', 'PC'),
+    ('Game K', '2021-11-22', 'Adventure', 'PlayStation'),
+    ('Game L', '2017-06-08', 'Simulation', 'Switch'),
+    ('Game M', '2016-03-19', 'Strategy', 'PC'),
+    ('Game N', '2019-09-30', 'Sports', 'Xbox'),
+    ('Game O', '2018-12-15', 'FPS', 'PC'),
+    ('Game P', '2020-05-02', 'Puzzle', 'Mobile'),
+    ('Game Q', '2017-08-27', 'Racing', 'PlayStation'),
+    ('Game R', '2022-03-11', 'Action', 'PC'),
+    ('Game S', '2020-10-18', 'Adventure', 'Switch'),
+    ('Game T', '2016-12-21', 'Simulation', 'PC'),
+    ('Game U', '2019-07-14', 'Sports', 'Xbox'),
+    ('Game V', '2018-04-09', 'FPS', 'PC'),
+    ('Game W', '2021-09-08', 'Puzzle', 'Mobile'),
+    ('Game X', '2017-11-05', 'Racing', 'PlayStation'),
+    ('Game Y', '2016-06-23', 'Action', 'PC'),
+    ('Game Z', '2020-08-07', 'Adventure', 'Switch');
+
+-- Add additional random records to reach 100+
+INSERT INTO Games (game_name, release_date, genre, platform)
+SELECT
+    CONCAT('Game', LPAD(ROW_NUMBER() OVER(), 2, '0')),
+    DATE_SUB(CURDATE(), INTERVAL FLOOR(RAND() * 365 * 5) DAY),
+    CASE FLOOR(RAND() * 5)
+        WHEN 0 THEN 'Action'
+        WHEN 1 THEN 'RPG'
+        WHEN 2 THEN 'Strategy'
+        WHEN 3 THEN 'Adventure'
+        WHEN 4 THEN 'Simulation'
+    END,
+    CASE FLOOR(RAND() * 4)
+        WHEN 0 THEN 'PC'
+        WHEN 1 THEN 'PlayStation'
+        WHEN 2 THEN 'Xbox'
+        WHEN 3 THEN 'Switch'
+    END
+FROM
+    information_schema.tables
+LIMIT 10;
+
+
+-- Create PlayerScores table
+CREATE TABLE PlayerScores (
+    score_id INT AUTO_INCREMENT PRIMARY KEY,
+    player_id INT NOT NULL,
+    game_id INT NOT NULL,
+    score INT NOT NULL,
+    score_date DATE NOT NULL,
+    FOREIGN KEY (player_id) REFERENCES Players(player_id),
+    FOREIGN KEY (game_id) REFERENCES Games(game_id)
+);
+
+-- Insert 100+ records into PlayerScores table
+INSERT INTO PlayerScores (player_id, game_id, score, score_date)
+SELECT
+    FLOOR(RAND() * 100) + 1,
+    FLOOR(RAND() * 100) + 1,
+    FLOOR(RAND() * 10000),
+    DATE_SUB(CURDATE(), INTERVAL FLOOR(RAND() * 365 * 2) DAY)
+FROM
+    information_schema.tables
+LIMIT 100;
+
+
+
+-- Create PlayerAchievements table
+CREATE TABLE PlayerAchievements (
+    achievement_id INT AUTO_INCREMENT PRIMARY KEY,
+    player_id INT NOT NULL,
+    game_id INT NOT NULL,
+    achievement_name VARCHAR(100) NOT NULL,
+    achievement_date DATE NOT NULL,
+    FOREIGN KEY (player_id) REFERENCES Players(player_id),
+    FOREIGN KEY (game_id) REFERENCES Games(game_id)
+);
+
+-- Insert 100+ records into PlayerAchievements table
+INSERT INTO PlayerAchievements (player_id, game_id, achievement_name, achievement_date)
+SELECT
+    FLOOR(RAND() * 100) + 1,
+    FLOOR(RAND() * 100) + 1,
+    CONCAT('Achievement ', LPAD(ROW_NUMBER() OVER(), 3, '0')),
+    DATE_SUB(CURDATE(), INTERVAL FLOOR(RAND() * 365 * 2) DAY)
+FROM
+    information_schema.tables
+LIMIT 100;
+
+
+-- Create PlayerInventory table
+CREATE TABLE PlayerInventory (
+    inventory_id INT AUTO_INCREMENT PRIMARY KEY,
+    player_id INT NOT NULL,
+    item_name VARCHAR(100) NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    acquisition_date DATE NOT NULL,
+    FOREIGN KEY (player_id) REFERENCES Players(player_id)
+);
+
+-- Insert 100+ records into PlayerInventory table
+INSERT INTO PlayerInventory (player_id, item_name, quantity, acquisition_date)
+SELECT
+    FLOOR(RAND() * 100) + 1,
+    CONCAT('Item ', LPAD(ROW_NUMBER() OVER(), 3, '0')),
+    FLOOR(RAND() * 10) + 1,
+    DATE_SUB(CURDATE(), INTERVAL FLOOR(RAND() * 365 * 3) DAY)
+FROM
+    information_schema.tables
+LIMIT 100;
