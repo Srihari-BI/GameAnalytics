@@ -1,0 +1,56 @@
+-- 1. How many players are registered in the database?
+SELECT COUNT(*) AS total_players
+FROM Players;
+
+-- 2. What are the top 5 games by release date?
+SELECT game_name, release_date
+FROM Games
+ORDER BY release_date
+LIMIT 5;
+
+-- 3. Which player has the highest total games played?
+SELECT player_name, total_games_played
+FROM Players
+ORDER BY total_games_played DESC
+LIMIT 1;
+
+-- 4. What is the average score for each game?
+SELECT game_id, game_name, AVG(score) AS average_score
+FROM PlayerScores ps
+JOIN Games g ON ps.game_id = g.game_id
+GROUP BY game_id, game_name;
+
+-- 5. How many achievements does each player have?
+SELECT p.player_id, p.player_name, COUNT(pa.achievement_id) AS total_achievements
+FROM Players p
+LEFT JOIN PlayerAchievements pa ON p.player_id = pa.player_id
+GROUP BY p.player_id, p.player_name
+ORDER BY total_achievements DESC;
+
+-- 6. Which players have achieved a specific achievement (e.g., 'Achievement 05')?
+SELECT p.player_id, p.player_name, pa.achievement_name
+FROM Players p
+JOIN PlayerAchievements pa ON p.player_id = pa.player_id
+WHERE pa.achievement_name = 'Achievement 05';
+
+-- 7. What is the most recently acquired item in the inventory for each player?
+SELECT pi.player_id, p.player_name, pi.item_name, MAX(pi.acquisition_date) AS latest_acquisition
+FROM PlayerInventory pi
+JOIN Players p ON pi.player_id = p.player_id
+GROUP BY pi.player_id, p.player_name, pi.item_name
+ORDER BY latest_acquisition DESC;
+
+-- 8. Which players have not logged in since a specific date (e.g., '2023-06-01')?
+SELECT player_id, player_name, last_login
+FROM Players
+WHERE last_login < '2023-06-01';
+
+-- 9. How many players have played a specific game (e.g., 'League of Legends')?
+SELECT COUNT(*) AS players_count
+FROM (SELECT DISTINCT player_id FROM PlayerScores WHERE game_id = (SELECT game_id FROM Games WHERE game_name = 'League of Legends')) AS subquery;
+
+-- 10. What is the total quantity of items in the inventory for each player?
+SELECT player_id, player_name, SUM(quantity) AS total_items
+FROM PlayerInventory pi
+JOIN Players p ON pi.player_id = p.player_id
+GROUP BY player_id, player_name;
